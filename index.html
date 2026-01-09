@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Scratch HSV Compact Exporter（左詰め）</title>
+<style>
+body {
+    background:#222;
+    color:#fff;
+    font-family:sans-serif;
+    text-align:center;
+}
+.container {
+    background:#333;
+    padding:20px;
+    border-radius:10px;
+    display:inline-block;
+}
+canvas {
+    border:1px solid #555;
+    image-rendering:pixelated;
+    width:360px;
+    height:360px;
+    margin:10px 0;
+}
+button {
+    padding:10px 20px;
+    font-size:16px;
+    margin:5px;
+    cursor:pointer;
+}
+textarea {
+    width:360px;
+    height:200px;
+    margin-top:10px;
+    font-family:monospace;
+    white-space:pre;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h2>HSV 3桁固定（左詰め・右スペース）</h2>
+    <input type="file" id="upload" accept="image/*"><br>
+    <canvas id="canvas" width="360" height="360"></canvas><br>
+    <button onclick="downloadTxt()">TXT保存</button>
+    <p id="status">画像を選択してね</p>
+    <textarea id="output" placeholder="ここにコピペ用データが出る"></textarea>
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const output = document.getElementById("output");
+const status = document.getElementById("status");
+
+let finalText = "";
+
+document.getElementById("upload").addEventListener("change", e => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = ev => {
+        const img = new Image();
+        img.onload = () => {
+            ctx.fillStyle = "white";
+            ctx.fillRect(0, 0, 360, 360);
+
+            const scale = Math.min(360 / img.width, 360 / img.height);
+            const w = img.width * scale;
+            const h = img.height * scale;
+            ctx.drawImage(img, (360 - w) / 2, (360 - h) / 2, w, h);
+
+            const pixels = ctx.getImageData(0, 0, 360, 360).data;
+            let lines = [];
+
+            for (let i = 0; i < pixels.length; i += 4) {
+                const hsv = rgbToScratchHSV(
+                    pixels[i],
+                    pixels[i + 1],
+                    pixels[i + 2]
+                );
+
+                lines.push(
+                    pad3Left(hsv.h) +
+                    pad3Left(hsv.s) +
+                    pad3Left(hsv.v)
+                );
+            }
+
+            finalText = lines.join("\n");
+            output.value = finalText;
+            status.textContent = `変換完了：${lines.length} 行`;
+        };
+        img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+});
+
+function pad3Left(n) {
+    const s = String(n);
+    if (s.length === 3) return s;
+    if (s.length === 2) return s + " ";
+    if (s.length === 1) return s + "  ";
+    return s.slice(0, 3);
+}
+
+function rgbToScratchHSV(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const d = max - min;
+    let h = 0;
+
+    if (d !== 0) {
+        if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+        else if (max === g) h = (b - r) / d + 2;
+        else h = (r - g) / d + 4;
+    }
+
+    return {
+        h: Math.round(h / 6 * 100),
+        s: Math.round((max === 0 ? 0 : d / max) * 100),
+        v: Math.round(max * 100)
+    };
+}
+
+function downloadTxt() {
+    const blob = new Blob([finalText], { type: "text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "scratch_hsv_3digit_left.txt";
+    a.click();
+}
+</script>
+
+</body>
+</html>
