@@ -67,6 +67,7 @@ canvas.height = 360;
 
 let finalData = [];
 let valuesPerFrame = 0;
+let pixelHeightPerFrame = 0;
 
 const FPS = 10;
 const MAX_TIME = 5;
@@ -84,6 +85,7 @@ document.getElementById("upload").addEventListener("change", e => {
 
         finalData = [];
         valuesPerFrame = 0;
+        pixelHeightPerFrame = 0;
 
         status.innerText = `変換中… ${totalFrames}フレーム`;
 
@@ -93,7 +95,9 @@ document.getElementById("upload").addEventListener("change", e => {
             status.innerText = `処理中 ${i + 1}/${totalFrames}`;
         }
 
-        // 先頭に「1フレーム分の行数」を入れる
+        // 1行目：1フレームの総データ数
+        // 2行目：ピクセル高さ
+        finalData.unshift(pixelHeightPerFrame);
         finalData.unshift(valuesPerFrame);
 
         status.innerText = "変換完了";
@@ -108,18 +112,17 @@ function seekVideo(time) {
 }
 
 function captureFrame() {
-    // 見た目用に一応クリア（描画されない部分は読まない）
     ctx.fillStyle = "white";
     ctx.fillRect(0, 0, 360, 360);
 
-    // 横360基準でスケール
+    // 横360固定でスケール
     const scale = 360 / video.videoWidth;
     const drawHeight = Math.floor(video.videoHeight * scale);
 
     // 上詰め描画
     ctx.drawImage(video, 0, 0, 360, drawHeight);
 
-    // ★ 白帯を含めず「動画がある高さだけ」読む
+    // 白帯を含めない有効高さ
     const validHeight = Math.min(drawHeight, 360);
     const pixels = ctx.getImageData(0, 0, 360, validHeight).data;
 
@@ -140,6 +143,7 @@ function captureFrame() {
     // 最初の1フレームだけ記録
     if (valuesPerFrame === 0) {
         valuesPerFrame = countThisFrame;
+        pixelHeightPerFrame = validHeight;
     }
 }
 
