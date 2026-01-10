@@ -40,7 +40,7 @@ select {
 <body>
 
 <div class="container">
-  <h2>動画 → Scratch HSV（3行1セット）</h2>
+  <h2>動画 → Scratch HSV（3行1セット、白行省略）</h2>
 
   <input type="file" id="videoInput" accept="video/*"><br><br>
 
@@ -142,6 +142,7 @@ function captureFrame(drawHeight, SIZE) {
       }
     }
 
+    // 白行は完全に省略、非白行だけ追加
     if (!isWhite) {
       frame.push(rowH);
       frame.push(rowS);
@@ -175,9 +176,9 @@ function rgbToScratchHSV(r, g, b) {
 
 function frameToText(frame) {
   let lines = [];
-  lines.push(frame.length.toString()); // 1フレームの行数
+  lines.push((frame.length / 3).toString()); // 上詰め後の1フレーム行数
   for (const row of frame) {
-    lines.push(row.join(",")); // 3行1セットを別行に出力
+    lines.push(row.join(",")); // 3行1セット
   }
   return lines.join("\n");
 }
