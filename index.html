@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <title>Scratch Video HSV Converter</title>
-
 <style>
 body {
   background:#222;
@@ -38,8 +37,8 @@ select {
 }
 </style>
 </head>
-
 <body>
+
 <div class="container">
   <h2>動画 → Scratch HSV（3行1セット）</h2>
 
@@ -59,7 +58,7 @@ select {
 
 <script>
 const FPS = 10;
-const MAX_TIME = 5;
+const MAX_TIME = 5; // 秒
 
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
@@ -87,9 +86,7 @@ function convert() {
   const start = () => {
     let output = [];
     let frameIndex = 0;
-
-    const totalFrames =
-      Math.floor(Math.min(video.duration, MAX_TIME) * FPS);
+    const totalFrames = Math.floor(Math.min(video.duration, MAX_TIME) * FPS);
 
     function nextFrame() {
       if (frameIndex >= totalFrames) {
@@ -117,10 +114,8 @@ function convert() {
 
 function drawVideo(SIZE) {
   ctx.clearRect(0, 0, SIZE, SIZE);
-
   const scale = SIZE / video.videoWidth;
   const drawHeight = Math.floor(video.videoHeight * scale);
-
   ctx.drawImage(video, 0, 0, SIZE, drawHeight);
   return drawHeight;
 }
@@ -137,10 +132,7 @@ function captureFrame(drawHeight, SIZE) {
 
     for (let x = 0; x < SIZE; x++) {
       const i = (y * SIZE + x) * 4;
-      const hsv = rgbToScratchHSV(
-        img[i], img[i + 1], img[i + 2]
-      );
-
+      const hsv = rgbToScratchHSV(img[i], img[i + 1], img[i + 2]);
       rowH.push(hsv.h);
       rowS.push(hsv.s);
       rowV.push(hsv.v);
@@ -156,14 +148,12 @@ function captureFrame(drawHeight, SIZE) {
       frame.push(rowV);
     }
   }
+
   return frame;
 }
 
 function rgbToScratchHSV(r, g, b) {
-  r /= 255;
-  g /= 255;
-  b /= 255;
-
+  r /= 255; g /= 255; b /= 255;
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   const d = max - min;
@@ -172,7 +162,7 @@ function rgbToScratchHSV(r, g, b) {
   if (d !== 0) {
     if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
     else if (max === g) h = (b - r) / d + 2;
-    else h = (r - g) / d + 4;
+    else if (max === b) h = (r - g) / d + 4;
     h /= 6;
   }
 
@@ -185,10 +175,9 @@ function rgbToScratchHSV(r, g, b) {
 
 function frameToText(frame) {
   let lines = [];
-  lines.push(frame.length.toString()); // 行数（3行単位込み）
-
+  lines.push(frame.length.toString()); // 1フレームの行数
   for (const row of frame) {
-    lines.push(row.join(","));
+    lines.push(row.join(",")); // 3行1セットを別行に出力
   }
   return lines.join("\n");
 }
@@ -197,7 +186,7 @@ function download(text) {
   const blob = new Blob([text], { type: "text/plain" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "scratch_video_hsv_3line.txt";
+  a.download = "scratch_video_hsv.txt";
   a.click();
 }
 </script>
