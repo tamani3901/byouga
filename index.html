@@ -45,7 +45,7 @@ button:active {
 <body>
 <div class="container">
     <h2>Scratch 動画→テキスト変換（10fps）</h2>
-    <p>最大5秒 / 横360固定 / 上詰め / HSV 0〜100</p>
+    <p>最大5秒 / 横360固定 / 上詰め / 白帯データなし</p>
 
     <input type="file" id="upload" accept="video/*"><br>
     <canvas id="canvas"></canvas><br>
@@ -66,6 +66,7 @@ canvas.width = 360;
 canvas.height = 360;
 
 let finalData = [];
+let valuesPerFrame = 0;
 
 const FPS = 10;
 const MAX_TIME = 5;
@@ -82,6 +83,8 @@ document.getElementById("upload").addEventListener("change", e => {
         const totalFrames = Math.floor(duration * FPS);
 
         finalData = [];
+        valuesPerFrame = 0;
+
         status.innerText = `変換中… ${totalFrames}フレーム`;
 
         for (let i = 0; i < totalFrames; i++) {
@@ -89,6 +92,9 @@ document.getElementById("upload").addEventListener("change", e => {
             captureFrame();
             status.innerText = `処理中 ${i + 1}/${totalFrames}`;
         }
+
+        // 先頭に「1フレーム分の行数」を入れる
+        finalData.unshift(valuesPerFrame);
 
         status.innerText = "変換完了";
     };
@@ -102,19 +108,22 @@ function seekVideo(time) {
 }
 
 function captureFrame() {
-    // 前フレーム消す（白でクリア）
+    // 見た目用に一応クリア（描画されない部分は読まない）
     ctx.fillStyle = "white";
     ctx.fillRect(0, 0, 360, 360);
 
-    // 横360基準でスケール（比率維持）
+    // 横360基準でスケール
     const scale = 360 / video.videoWidth;
-    const w = 360;
-    const h = video.videoHeight * scale;
+    const drawHeight = Math.floor(video.videoHeight * scale);
 
-    // 上詰め描画（中央寄せしない）
-    ctx.drawImage(video, 0, 0, w, h);
+    // 上詰め描画
+    ctx.drawImage(video, 0, 0, 360, drawHeight);
 
-    const pixels = ctx.getImageData(0, 0, 360, 360).data;
+    // ★ 白帯を含めず「動画がある高さだけ」読む
+    const validHeight = Math.min(drawHeight, 360);
+    const pixels = ctx.getImageData(0, 0, 360, validHeight).data;
+
+    let countThisFrame = 0;
 
     for (let i = 0; i < pixels.length; i += 4) {
         const hsv = rgbToScratchHSV1(
@@ -125,6 +134,12 @@ function captureFrame() {
         finalData.push(hsv.h);
         finalData.push(hsv.s);
         finalData.push(hsv.v);
+        countThisFrame += 3;
+    }
+
+    // 最初の1フレームだけ記録
+    if (valuesPerFrame === 0) {
+        valuesPerFrame = countThisFrame;
     }
 }
 
