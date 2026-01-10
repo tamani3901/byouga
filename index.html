@@ -45,7 +45,7 @@ button:active {
 <body>
 <div class="container">
     <h2>Scratch 動画→テキスト変換（10fps）</h2>
-    <p>最大5秒 / 360×360 / HSV 0〜100</p>
+    <p>最大5秒 / 横360固定 / 上詰め / HSV 0〜100</p>
 
     <input type="file" id="upload" accept="video/*"><br>
     <canvas id="canvas"></canvas><br>
@@ -102,24 +102,17 @@ function seekVideo(time) {
 }
 
 function captureFrame() {
+    // 前フレーム消す（白でクリア）
     ctx.fillStyle = "white";
     ctx.fillRect(0, 0, 360, 360);
 
-    const scale = Math.min(
-        360 / video.videoWidth,
-        360 / video.videoHeight
-    );
-
-    const w = video.videoWidth * scale;
+    // 横360基準でスケール（比率維持）
+    const scale = 360 / video.videoWidth;
+    const w = 360;
     const h = video.videoHeight * scale;
 
-    ctx.drawImage(
-        video,
-        (360 - w) / 2,
-        (360 - h) / 2,
-        w,
-        h
-    );
+    // 上詰め描画（中央寄せしない）
+    ctx.drawImage(video, 0, 0, w, h);
 
     const pixels = ctx.getImageData(0, 0, 360, 360).data;
 
