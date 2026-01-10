@@ -46,7 +46,7 @@ select { font-size:16px; }
 
 <script>
 const FPS = 10;
-const MAX_TIME = 5; // 秒
+const MAX_TIME = 5;
 const WHITE = 255;
 
 const canvas = document.getElementById("canvas");
@@ -55,27 +55,35 @@ const status = document.getElementById("status");
 
 let video = document.createElement("video");
 video.muted = true;
+video.playsInline = true;
 
 document.getElementById("videoInput").addEventListener("change", e => {
   video.src = URL.createObjectURL(e.target.files[0]);
-  video.load();
+  status.innerText = "動画読み込み完了";
 });
 
 function convert() {
+  if (!video.src) {
+    alert("動画選んで");
+    return;
+  }
+
   const SIZE = Number(document.getElementById("sizeSelect").value);
   canvas.width = SIZE;
   canvas.height = SIZE;
 
-  let output = [];
-  let frameIndex = 0;
+  const startProcess = () => {
+    let output = [];
+    let frameIndex = 0;
 
-  video.onloadedmetadata = () => {
-    const totalFrames = Math.floor(Math.min(video.duration, MAX_TIME) * FPS);
+    const totalFrames = Math.floor(
+      Math.min(video.duration, MAX_TIME) * FPS
+    );
 
-    function processFrame() {
+    function nextFrame() {
       if (frameIndex >= totalFrames) {
         download(output.join("\n"));
-        status.innerText = "完了！";
+        status.innerText = "変換完了！";
         return;
       }
 
@@ -86,19 +94,23 @@ function convert() {
         output.push(frameToText(frame));
         frameIndex++;
         status.innerText = `変換中 ${frameIndex}/${totalFrames}`;
-        processFrame();
+        nextFrame();
       };
     }
-    processFrame();
+    nextFrame();
   };
+
+  if (video.readyState >= 1) {
+    startProcess();
+  } else {
+    video.onloadedmetadata = startProcess;
+  }
 }
 
 function drawVideo(video, SIZE) {
   ctx.clearRect(0, 0, SIZE, SIZE);
-
   const scale = SIZE / video.videoWidth;
   const drawHeight = Math.floor(video.videoHeight * scale);
-
   ctx.drawImage(video, 0, 0, SIZE, drawHeight);
   return drawHeight;
 }
@@ -113,7 +125,7 @@ function captureFrame(drawHeight, SIZE) {
 
     for (let x = 0; x < SIZE; x++) {
       const i = (y * SIZE + x) * 4;
-      const v = img[i]; // R成分のみ
+      const v = img[i];
       row.push(v);
       if (v !== WHITE) isWhite = false;
     }
