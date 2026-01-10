@@ -68,6 +68,7 @@ canvas.height = 360;
 let finalData = [];
 let valuesPerFrame = 0;
 let pixelHeightPerFrame = 0;
+let totalFramesGlobal = 0;
 
 const FPS = 10;
 const MAX_TIME = 5;
@@ -82,6 +83,7 @@ document.getElementById("upload").addEventListener("change", e => {
     video.onloadedmetadata = async () => {
         const duration = Math.min(video.duration, MAX_TIME);
         const totalFrames = Math.floor(duration * FPS);
+        totalFramesGlobal = totalFrames;
 
         finalData = [];
         valuesPerFrame = 0;
@@ -97,6 +99,8 @@ document.getElementById("upload").addEventListener("change", e => {
 
         // 1行目：1フレームの総データ数
         // 2行目：ピクセル高さ
+        // 3行目：総フレーム数
+        finalData.unshift(totalFramesGlobal);
         finalData.unshift(pixelHeightPerFrame);
         finalData.unshift(valuesPerFrame);
 
@@ -115,14 +119,11 @@ function captureFrame() {
     ctx.fillStyle = "white";
     ctx.fillRect(0, 0, 360, 360);
 
-    // 横360固定でスケール
     const scale = 360 / video.videoWidth;
     const drawHeight = Math.floor(video.videoHeight * scale);
 
-    // 上詰め描画
     ctx.drawImage(video, 0, 0, 360, drawHeight);
 
-    // 白帯を含めない有効高さ
     const validHeight = Math.min(drawHeight, 360);
     const pixels = ctx.getImageData(0, 0, 360, validHeight).data;
 
