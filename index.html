@@ -2,112 +2,130 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Scratch HSV Compact Exporter（左詰め）</title>
+<title>Scratch Video Full Color Converter</title>
 <style>
 body {
-    background:#222;
-    color:#fff;
-    font-family:sans-serif;
-    text-align:center;
+    font-family: sans-serif;
+    text-align: center;
+    background: #222;
+    color: #fff;
+    padding: 20px;
 }
 .container {
-    background:#333;
-    padding:20px;
-    border-radius:10px;
-    display:inline-block;
+    background: #333;
+    padding: 20px;
+    border-radius: 10px;
+    display: inline-block;
+    border: 2px solid #4C97FF;
 }
 canvas {
-    border:1px solid #555;
-    image-rendering:pixelated;
-    width:360px;
-    height:360px;
-    margin:10px 0;
+    border: 1px solid #555;
+    background: white;
+    width: 360px;
+    height: 360px;
+    image-rendering: pixelated;
+    margin: 20px 0;
 }
 button {
-    padding:10px 20px;
-    font-size:16px;
-    margin:5px;
-    cursor:pointer;
+    background: #4C97FF;
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 18px;
+    font-weight: bold;
 }
-textarea {
-    width:360px;
-    height:200px;
-    margin-top:10px;
-    font-family:monospace;
-    white-space:pre;
-}
+button:active { background: #3d85e6; }
 </style>
 </head>
-<body>
 
+<body>
 <div class="container">
-    <h2>HSV 3桁固定（左詰め・右スペース）</h2>
-    <input type="file" id="upload" accept="image/*"><br>
-    <canvas id="canvas" width="360" height="360"></canvas><br>
-    <button onclick="downloadTxt()">TXT保存</button>
-    <p id="status">画像を選択してね</p>
-    <textarea id="output" placeholder="ここにコピペ用データが出る"></textarea>
+    <h2>Scratch 動画→テキスト変換（10fps）</h2>
+    <p>最大5秒 / 360×360 / HSV 0〜100</p>
+
+    <input type="file" id="upload" accept="video/*"><br>
+    <canvas id="canvas"></canvas><br>
+
+    <button onclick="downloadTxt()">テキスト保存</button>
+    <p id="status">動画を選択して</p>
 </div>
+
+<video id="video" style="display:none"></video>
 
 <script>
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
-const output = document.getElementById("output");
+const video = document.getElementById("video");
 const status = document.getElementById("status");
 
-let finalText = "";
+canvas.width = 360;
+canvas.height = 360;
+
+let finalData = [];
+const FPS = 10;
+const MAX_TIME = 5;
 
 document.getElementById("upload").addEventListener("change", e => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = ev => {
-        const img = new Image();
-        img.onload = () => {
-            ctx.fillStyle = "white";
-            ctx.fillRect(0, 0, 360, 360);
+    video.src = URL.createObjectURL(file);
+    video.load();
 
-            const scale = Math.min(360 / img.width, 360 / img.height);
-            const w = img.width * scale;
-            const h = img.height * scale;
-            ctx.drawImage(img, (360 - w) / 2, (360 - h) / 2, w, h);
+    video.onloadedmetadata = async () => {
+        const duration = Math.min(video.duration, MAX_TIME);
+        const totalFrames = Math.floor(duration * FPS);
+        finalData = [];
 
-            const pixels = ctx.getImageData(0, 0, 360, 360).data;
-            let lines = [];
+        status.innerText = `変換中… ${totalFrames}フレーム`;
 
-            for (let i = 0; i < pixels.length; i += 4) {
-                const hsv = rgbToScratchHSV(
-                    pixels[i],
-                    pixels[i + 1],
-                    pixels[i + 2]
-                );
+        for (let i = 0; i < totalFrames; i++) {
+            const time = i / FPS;
+            await seekVideo(time);
+            captureFrame(i);
+            status.innerText = `処理中 ${i+1}/${totalFrames}`;
+        }
 
-                lines.push(
-                    pad3Left(hsv.h) +
-                    pad3Left(hsv.s) +
-                    pad3Left(hsv.v)
-                );
-            }
-
-            finalText = lines.join("\n");
-            output.value = finalText;
-            status.textContent = `変換完了：${lines.length} 行`;
-        };
-        img.src = ev.target.result;
+        status.innerText = `完了！ フレーム数: ${totalFrames}`;
     };
-    reader.readAsDataURL(file);
 });
 
-function pad3Left(n) {
-    const s = String(n);
-    if (s.length === 3) return s;
-    if (s.length === 2) return s + " ";
-    if (s.length === 1) return s + "  ";
-    return s.slice(0, 3);
+function seekVideo(time) {
+    return new Promise(resolve => {
+        video.currentTime = time;
+        video.onseeked = () => resolve();
+    });
 }
 
-function rgbToScratchHSV(r, g, b) {
+function captureFrame(frameIndex) {
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, 360, 360);
+
+    const scale = Math.min(360 / video.videoWidth, 360 / video.videoHeight);
+    const w = video.videoWidth * scale;
+    const h = video.videoHeight * scale;
+
+    ctx.drawImage(
+        video,
+        (360 - w) / 2,
+        (360 - h) / 2,
+        w,
+        h
+    );
+
+    const pixels = ctx.getImageData(0, 0, 360, 360).data;
+
+    finalData.push(`--- FRAME ${frameIndex} ---`);
+
+    for (let i = 0; i < pixels.length; i += 4) {
+        const hsv = rgbToScratchHSV1(pixels[i], pixels[i+1], pixels[i+2]);
+        finalData.push(hsv.h, hsv.s, hsv.v);
+    }
+}
+
+function rgbToScratchHSV1(r, g, b) {
     r /= 255; g /= 255; b /= 255;
     const max = Math.max(r, g, b);
     const min = Math.min(r, g, b);
@@ -121,20 +139,19 @@ function rgbToScratchHSV(r, g, b) {
     }
 
     return {
-        h: Math.round(h / 6 * 100),
+        h: Math.round((h / 6) * 100),
         s: Math.round((max === 0 ? 0 : d / max) * 100),
         v: Math.round(max * 100)
     };
 }
 
 function downloadTxt() {
-    const blob = new Blob([finalText], { type: "text/plain" });
+    const blob = new Blob([finalData.join("\n")], { type: "text/plain" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "scratch_hsv_3digit_left.txt";
+    a.download = "scratch_video_data.txt";
     a.click();
 }
 </script>
-
 </body>
 </html>
