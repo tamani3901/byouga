@@ -2,181 +2,142 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Scratch Video Full Color Converter</title>
+<title>Scratch Video Converter</title>
 <style>
 body {
-    font-family: sans-serif;
-    text-align: center;
-    background: #222;
-    color: #fff;
-    padding: 20px;
+  background:#222; color:white; text-align:center; font-family:sans-serif;
 }
 .container {
-    background: #333;
-    padding: 20px;
-    border-radius: 10px;
-    display: inline-block;
-    border: 2px solid #4C97FF;
+  background:#333; padding:20px; border-radius:10px;
+  display:inline-block; border:2px solid #4C97FF;
 }
 canvas {
-    border: 1px solid #555;
-    background: white;
-    width: 360px;
-    height: 360px;
-    image-rendering: pixelated;
-    margin: 20px 0;
+  background:white;
+  image-rendering:pixelated;
+  margin:10px 0;
 }
 button {
-    background: #4C97FF;
-    color: white;
-    border: none;
-    padding: 15px 30px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 18px;
-    font-weight: bold;
+  background:#4C97FF; color:white;
+  border:none; padding:12px 25px;
+  font-size:16px; font-weight:bold;
+  border-radius:6px; cursor:pointer;
 }
-button:active {
-    background: #3d85e6;
-}
+select { font-size:16px; }
 </style>
 </head>
 
 <body>
 <div class="container">
-    <h2>Scratch 動画→テキスト変換（10fps）</h2>
-    <p>最大5秒 / 横360固定 / 上詰め / 白帯データなし</p>
+  <h2>動画 → Scratchテキスト</h2>
 
-    <input type="file" id="upload" accept="video/*"><br>
-    <canvas id="canvas"></canvas><br>
+  <input type="file" id="videoInput" accept="video/*"><br><br>
 
-    <button onclick="downloadTxt()">テキスト保存</button>
-    <p id="status">動画を選択して</p>
+  サイズ：
+  <select id="sizeSelect">
+    <option value="360">360×360</option>
+    <option value="180">180×180</option>
+  </select><br><br>
+
+  <canvas id="canvas"></canvas><br>
+  <button onclick="convert()">変換開始</button>
+
+  <p id="status">動画を選択してね</p>
 </div>
 
-<video id="video" style="display:none"></video>
-
 <script>
+const FPS = 10;
+const MAX_TIME = 5; // 秒
+const WHITE = 255;
+
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
-const video = document.getElementById("video");
 const status = document.getElementById("status");
 
-canvas.width = 360;
-canvas.height = 360;
+let video = document.createElement("video");
+video.muted = true;
 
-let finalData = [];
-let valuesPerFrame = 0;
-
-const FPS = 10;
-const MAX_TIME = 5;
-
-document.getElementById("upload").addEventListener("change", e => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    video.src = URL.createObjectURL(file);
-    video.load();
-
-    video.onloadedmetadata = async () => {
-        const duration = Math.min(video.duration, MAX_TIME);
-        const totalFrames = Math.floor(duration * FPS);
-
-        finalData = [];
-        valuesPerFrame = 0;
-
-        status.innerText = `変換中… ${totalFrames}フレーム`;
-
-        for (let i = 0; i < totalFrames; i++) {
-            await seekVideo(i / FPS);
-            captureFrame();
-            status.innerText = `処理中 ${i + 1}/${totalFrames}`;
-        }
-
-        // 先頭に「1フレーム分の行数」を入れる
-        finalData.unshift(valuesPerFrame);
-
-        status.innerText = "変換完了";
-    };
+document.getElementById("videoInput").addEventListener("change", e => {
+  video.src = URL.createObjectURL(e.target.files[0]);
+  video.load();
 });
 
-function seekVideo(time) {
-    return new Promise(resolve => {
-        video.currentTime = time;
-        video.onseeked = () => resolve();
-    });
+function convert() {
+  const SIZE = Number(document.getElementById("sizeSelect").value);
+  canvas.width = SIZE;
+  canvas.height = SIZE;
+
+  let output = [];
+  let frameIndex = 0;
+
+  video.onloadedmetadata = () => {
+    const totalFrames = Math.floor(Math.min(video.duration, MAX_TIME) * FPS);
+
+    function processFrame() {
+      if (frameIndex >= totalFrames) {
+        download(output.join("\n"));
+        status.innerText = "完了！";
+        return;
+      }
+
+      video.currentTime = frameIndex / FPS;
+      video.onseeked = () => {
+        const drawHeight = drawVideo(video, SIZE);
+        const frame = captureFrame(drawHeight, SIZE);
+        output.push(frameToText(frame));
+        frameIndex++;
+        status.innerText = `変換中 ${frameIndex}/${totalFrames}`;
+        processFrame();
+      };
+    }
+    processFrame();
+  };
 }
 
-function captureFrame() {
-    // 見た目用に一応クリア（描画されない部分は読まない）
-    ctx.fillStyle = "white";
-    ctx.fillRect(0, 0, 360, 360);
+function drawVideo(video, SIZE) {
+  ctx.clearRect(0, 0, SIZE, SIZE);
 
-    // 横360基準でスケール
-    const scale = 360 / video.videoWidth;
-    const drawHeight = Math.floor(video.videoHeight * scale);
+  const scale = SIZE / video.videoWidth;
+  const drawHeight = Math.floor(video.videoHeight * scale);
 
-    // 上詰め描画
-    ctx.drawImage(video, 0, 0, 360, drawHeight);
-
-    // ★ 白帯を含めず「動画がある高さだけ」読む
-    const validHeight = Math.min(drawHeight, 360);
-    const pixels = ctx.getImageData(0, 0, 360, validHeight).data;
-
-    let countThisFrame = 0;
-
-    for (let i = 0; i < pixels.length; i += 4) {
-        const hsv = rgbToScratchHSV1(
-            pixels[i],
-            pixels[i + 1],
-            pixels[i + 2]
-        );
-        finalData.push(hsv.h);
-        finalData.push(hsv.s);
-        finalData.push(hsv.v);
-        countThisFrame += 3;
-    }
-
-    // 最初の1フレームだけ記録
-    if (valuesPerFrame === 0) {
-        valuesPerFrame = countThisFrame;
-    }
+  ctx.drawImage(video, 0, 0, SIZE, drawHeight);
+  return drawHeight;
 }
 
-function rgbToScratchHSV1(r, g, b) {
-    r /= 255;
-    g /= 255;
-    b /= 255;
+function captureFrame(drawHeight, SIZE) {
+  const img = ctx.getImageData(0, 0, SIZE, drawHeight).data;
+  let frame = [];
 
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    const d = max - min;
+  for (let y = 0; y < drawHeight; y++) {
+    let row = [];
+    let isWhite = true;
 
-    let h = 0;
-
-    if (d !== 0) {
-        if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
-        else if (max === g) h = (b - r) / d + 2;
-        else h = (r - g) / d + 4;
+    for (let x = 0; x < SIZE; x++) {
+      const i = (y * SIZE + x) * 4;
+      const v = img[i]; // R成分のみ
+      row.push(v);
+      if (v !== WHITE) isWhite = false;
     }
 
-    return {
-        h: Math.round((h / 6) * 100),
-        s: Math.round((max === 0 ? 0 : d / max) * 100),
-        v: Math.round(max * 100)
-    };
+    if (!isWhite) frame.push(row);
+  }
+  return frame;
 }
 
-function downloadTxt() {
-    const blob = new Blob(
-        [finalData.join("\n")],
-        { type: "text/plain" }
-    );
+function frameToText(frame) {
+  let lines = [];
+  lines.push(frame.length.toString());
+  for (const row of frame) {
+    lines.push(row.join(","));
+  }
+  return lines.join("\n");
+}
 
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "scratch_video_data.txt";
-    a.click();
+function download(text) {
+  const blob = new Blob([text], {type:"text/plain"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "scratch_video.txt";
+  a.click();
 }
 </script>
 </body>
