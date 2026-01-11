@@ -21,20 +21,19 @@ body {
 canvas {
     border: 1px solid #555;
     background: white;
-    width: 360px;
-    height: 360px;
     image-rendering: pixelated;
     margin: 20px 0;
 }
-button {
+button, select {
     background: #4C97FF;
     color: white;
     border: none;
-    padding: 15px 30px;
+    padding: 10px 20px;
     border-radius: 5px;
     cursor: pointer;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: bold;
+    margin: 5px;
 }
 button:active {
     background: #3d85e6;
@@ -45,7 +44,14 @@ button:active {
 <body>
 <div class="container">
     <h2>Scratch 動画→テキスト変換（10fps）</h2>
-    <p>最大5秒 / 横360固定 / 上詰め / 白帯データなし</p>
+    <p>最大5秒 / 上詰め / 白帯データなし</p>
+
+    解像度：
+    <select id="resolution">
+        <option value="360">360 × 360</option>
+        <option value="180">180 × 180</option>
+    </select>
+    <br><br>
 
     <input type="file" id="upload" accept="video/*"><br>
     <canvas id="canvas"></canvas><br>
@@ -61,9 +67,9 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const video = document.getElementById("video");
 const status = document.getElementById("status");
+const resolutionSelect = document.getElementById("resolution");
 
-canvas.width = 360;
-canvas.height = 360;
+let SIZE = 360;
 
 let finalData = [];
 let valuesPerFrame = 0;
@@ -72,6 +78,17 @@ let totalFramesGlobal = 0;
 
 const FPS = 10;
 const MAX_TIME = 5;
+
+function updateCanvasSize() {
+    SIZE = Number(resolutionSelect.value);
+    canvas.width = SIZE;
+    canvas.height = SIZE;
+    canvas.style.width = SIZE + "px";
+    canvas.style.height = SIZE + "px";
+}
+
+updateCanvasSize();
+resolutionSelect.addEventListener("change", updateCanvasSize);
 
 document.getElementById("upload").addEventListener("change", e => {
     const file = e.target.files[0];
@@ -116,16 +133,15 @@ function seekVideo(time) {
 }
 
 function captureFrame() {
-    ctx.fillStyle = "white";
-    ctx.fillRect(0, 0, 360, 360);
-
-    const scale = 360 / video.videoWidth;
+    const scale = SIZE / video.videoWidth;
     const drawHeight = Math.floor(video.videoHeight * scale);
 
-    ctx.drawImage(video, 0, 0, 360, drawHeight);
+    const validHeight = Math.min(drawHeight, SIZE);
 
-    const validHeight = Math.min(drawHeight, 360);
-    const pixels = ctx.getImageData(0, 0, 360, validHeight).data;
+    ctx.clearRect(0, 0, SIZE, SIZE);
+    ctx.drawImage(video, 0, 0, SIZE, drawHeight);
+
+    const pixels = ctx.getImageData(0, 0, SIZE, validHeight).data;
 
     let countThisFrame = 0;
 
@@ -141,7 +157,6 @@ function captureFrame() {
         countThisFrame += 3;
     }
 
-    // 最初の1フレームだけ記録
     if (valuesPerFrame === 0) {
         valuesPerFrame = countThisFrame;
         pixelHeightPerFrame = validHeight;
