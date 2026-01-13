@@ -44,13 +44,24 @@ button:active {
 <body>
 <div class="container">
     <h2>Scratch 動画→テキスト変換（10fps）</h2>
-    <p>最大5秒 / 上詰め / 白帯データなし</p>
+    <p>上詰め / 白帯データなし</p>
 
     解像度：
     <select id="resolution">
         <option value="360">360 × 360</option>
         <option value="180">180 × 180</option>
     </select>
+
+    <br><br>
+
+    変換秒数：
+    <select id="timeLimit">
+        <option value="5">5秒</option>
+        <option value="10">10秒</option>
+        <option value="15">15秒</option>
+        <option value="auto">可変（動画長）</option>
+    </select>
+
     <br><br>
 
     <input type="file" id="upload" accept="video/*"><br>
@@ -68,6 +79,7 @@ const ctx = canvas.getContext("2d");
 const video = document.getElementById("video");
 const status = document.getElementById("status");
 const resolutionSelect = document.getElementById("resolution");
+const timeLimitSelect = document.getElementById("timeLimit");
 
 let SIZE = 360;
 
@@ -77,7 +89,6 @@ let pixelHeightPerFrame = 0;
 let totalFramesGlobal = 0;
 
 const FPS = 10;
-const MAX_TIME = 5;
 
 function updateCanvasSize() {
     SIZE = Number(resolutionSelect.value);
@@ -98,7 +109,19 @@ document.getElementById("upload").addEventListener("change", e => {
     video.load();
 
     video.onloadedmetadata = async () => {
-        const duration = Math.min(video.duration, MAX_TIME);
+        let selected = timeLimitSelect.value;
+        let maxTime;
+
+        if (selected === "auto") {
+            maxTime = video.duration;
+        } else {
+            maxTime = Number(selected);
+            if (video.duration < maxTime) {
+                maxTime = video.duration; // 自動で可変
+            }
+        }
+
+        const duration = maxTime;
         const totalFrames = Math.floor(duration * FPS);
         totalFramesGlobal = totalFrames;
 
@@ -135,7 +158,6 @@ function seekVideo(time) {
 function captureFrame() {
     const scale = SIZE / video.videoWidth;
     const drawHeight = Math.floor(video.videoHeight * scale);
-
     const validHeight = Math.min(drawHeight, SIZE);
 
     ctx.clearRect(0, 0, SIZE, SIZE);
