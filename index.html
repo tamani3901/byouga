@@ -43,7 +43,7 @@ button:active {
 
 <body>
 <div class="container">
-    <h2>Scratch 動画→テキスト変換（10fps）</h2>
+    <h2>Scratch 動画→テキスト変換</h2>
     <p>上詰め / 白帯データなし</p>
 
     解像度：
@@ -64,6 +64,15 @@ button:active {
 
     <br><br>
 
+    FPS：
+    <select id="fpsSelect">
+        <option value="10">10 fps</option>
+        <option value="15">15 fps</option>
+        <option value="24">24 fps</option>
+    </select>
+
+    <br><br>
+
     <input type="file" id="upload" accept="video/*"><br>
     <canvas id="canvas"></canvas><br>
 
@@ -78,8 +87,10 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const video = document.getElementById("video");
 const status = document.getElementById("status");
+
 const resolutionSelect = document.getElementById("resolution");
 const timeLimitSelect = document.getElementById("timeLimit");
+const fpsSelect = document.getElementById("fpsSelect");
 
 let SIZE = 360;
 
@@ -87,8 +98,6 @@ let finalData = [];
 let valuesPerFrame = 0;
 let pixelHeightPerFrame = 0;
 let totalFramesGlobal = 0;
-
-const FPS = 10;
 
 function updateCanvasSize() {
     SIZE = Number(resolutionSelect.value);
@@ -109,6 +118,8 @@ document.getElementById("upload").addEventListener("change", e => {
     video.load();
 
     video.onloadedmetadata = async () => {
+        const FPS = Number(fpsSelect.value);
+
         let selected = timeLimitSelect.value;
         let maxTime;
 
@@ -117,7 +128,7 @@ document.getElementById("upload").addEventListener("change", e => {
         } else {
             maxTime = Number(selected);
             if (video.duration < maxTime) {
-                maxTime = video.duration; // 自動で可変
+                maxTime = video.duration;
             }
         }
 
@@ -129,7 +140,7 @@ document.getElementById("upload").addEventListener("change", e => {
         valuesPerFrame = 0;
         pixelHeightPerFrame = 0;
 
-        status.innerText = `変換中… ${totalFrames}フレーム`;
+        status.innerText = `変換中… ${totalFrames}フレーム (${FPS}fps)`;
 
         for (let i = 0; i < totalFrames; i++) {
             await seekVideo(i / FPS);
@@ -173,9 +184,7 @@ function captureFrame() {
             pixels[i + 1],
             pixels[i + 2]
         );
-        finalData.push(hsv.h);
-        finalData.push(hsv.s);
-        finalData.push(hsv.v);
+        finalData.push(hsv.h, hsv.s, hsv.v);
         countThisFrame += 3;
     }
 
@@ -195,7 +204,6 @@ function rgbToScratchHSV1(r, g, b) {
     const d = max - min;
 
     let h = 0;
-
     if (d !== 0) {
         if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
         else if (max === g) h = (b - r) / d + 2;
