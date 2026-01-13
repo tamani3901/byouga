@@ -35,8 +35,9 @@ button, select {
     font-weight: bold;
     margin: 5px;
 }
-button:active {
-    background: #3d85e6;
+button:disabled, select:disabled {
+    background: #777;
+    cursor: not-allowed;
 }
 </style>
 </head>
@@ -98,16 +99,24 @@ let finalData = [];
 let pixelHeightPerFrame = 0;
 let totalFramesGlobal = 0;
 
-function updateCanvasSize() {
+function updateCanvasSizeAndFPS() {
     SIZE = Number(resolutionSelect.value);
+
     canvas.width = SIZE;
     canvas.height = SIZE;
     canvas.style.width = SIZE + "px";
     canvas.style.height = SIZE + "px";
+
+    if (SIZE === 360) {
+        fpsSelect.value = "10";
+        fpsSelect.disabled = true;
+    } else {
+        fpsSelect.disabled = false;
+    }
 }
 
-updateCanvasSize();
-resolutionSelect.addEventListener("change", updateCanvasSize);
+updateCanvasSizeAndFPS();
+resolutionSelect.addEventListener("change", updateCanvasSizeAndFPS);
 
 document.getElementById("upload").addEventListener("change", e => {
     const file = e.target.files[0];
@@ -117,7 +126,9 @@ document.getElementById("upload").addEventListener("change", e => {
     video.load();
 
     video.onloadedmetadata = async () => {
-        const FPS = Number(fpsSelect.value);
+
+        // 360x360 の場合は強制10fps
+        const FPS = (SIZE === 360) ? 10 : Number(fpsSelect.value);
 
         let selected = timeLimitSelect.value;
         let maxTime;
