@@ -95,7 +95,6 @@ const fpsSelect = document.getElementById("fpsSelect");
 let SIZE = 360;
 
 let finalData = [];
-let valuesPerFrame = 0;
 let pixelHeightPerFrame = 0;
 let totalFramesGlobal = 0;
 
@@ -137,7 +136,6 @@ document.getElementById("upload").addEventListener("change", e => {
         totalFramesGlobal = totalFrames;
 
         finalData = [];
-        valuesPerFrame = 0;
         pixelHeightPerFrame = 0;
 
         status.innerText = `変換中… ${totalFrames}フレーム (${FPS}fps)`;
@@ -148,12 +146,12 @@ document.getElementById("upload").addEventListener("change", e => {
             status.innerText = `処理中 ${i + 1}/${totalFrames}`;
         }
 
-        // 1行目：1フレームの総データ数
+        // 1行目：fps
         // 2行目：ピクセル高さ
         // 3行目：総フレーム数
         finalData.unshift(totalFramesGlobal);
         finalData.unshift(pixelHeightPerFrame);
-        finalData.unshift(valuesPerFrame);
+        finalData.unshift(FPS);
 
         status.innerText = "変換完了";
     };
@@ -176,8 +174,6 @@ function captureFrame() {
 
     const pixels = ctx.getImageData(0, 0, SIZE, validHeight).data;
 
-    let countThisFrame = 0;
-
     for (let i = 0; i < pixels.length; i += 4) {
         const hsv = rgbToScratchHSV1(
             pixels[i],
@@ -185,11 +181,9 @@ function captureFrame() {
             pixels[i + 2]
         );
         finalData.push(hsv.h, hsv.s, hsv.v);
-        countThisFrame += 3;
     }
 
-    if (valuesPerFrame === 0) {
-        valuesPerFrame = countThisFrame;
+    if (pixelHeightPerFrame === 0) {
         pixelHeightPerFrame = validHeight;
     }
 }
