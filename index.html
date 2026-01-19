@@ -12,6 +12,7 @@ body {
     padding: 20px;
 }
 .container {
+    position: relative;
     background: #333;
     padding: 20px;
     border-radius: 10px;
@@ -39,11 +40,32 @@ button:disabled, select:disabled {
     background: #777;
     cursor: not-allowed;
 }
+
+/* fpsロック解除ボタン */
+.fps-unlock {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 14px;
+    padding: 6px 10px;
+}
+
+/* 警告文 */
+.warning {
+    color: #ff6666;
+    font-size: 14px;
+    margin-top: 10px;
+    display: none;
+}
 </style>
 </head>
 
 <body>
 <div class="container">
+    <button id="fpsUnlockBtn" class="fps-unlock">
+        FPSロック解除：OFF
+    </button>
+
     <h2>Scratch 動画→テキスト変換</h2>
     <p>上詰め / 白帯データなし</p>
 
@@ -72,7 +94,13 @@ button:disabled, select:disabled {
         <option value="24">24 fps</option>
     </select>
 
-    <br><br>
+    <div id="fpsWarning" class="warning">
+        ⚠ 警告<br>
+        ファイルサイズが大きくなりサイトがフリーズしたり<br>
+        落ちる場合があるので注意してください
+    </div>
+
+    <br>
 
     <input type="file" id="upload" accept="video/*"><br>
     <canvas id="canvas"></canvas><br>
@@ -93,15 +121,19 @@ const resolutionSelect = document.getElementById("resolution");
 const timeLimitSelect = document.getElementById("timeLimit");
 const fpsSelect = document.getElementById("fpsSelect");
 
+const fpsUnlockBtn = document.getElementById("fpsUnlockBtn");
+const fpsWarning = document.getElementById("fpsWarning");
+
 let SIZE = 360;
+let fpsUnlocked = false;
 
 let finalData = [];
 let pixelHeightPerFrame = 0;
 let totalFramesGlobal = 0;
 
-const AUTO_MAX_TIME = 20; // 可変の最大秒数
+const AUTO_MAX_TIME = 20;
 
-function updateCanvasSizeAndFPS() {
+function updateCanvasAndFPS() {
     SIZE = Number(resolutionSelect.value);
 
     canvas.width = SIZE;
@@ -109,16 +141,30 @@ function updateCanvasSizeAndFPS() {
     canvas.style.width = SIZE + "px";
     canvas.style.height = SIZE + "px";
 
-    if (SIZE === 360) {
+    if (SIZE === 360 && !fpsUnlocked) {
         fpsSelect.value = "10";
         fpsSelect.disabled = true;
+        fpsWarning.style.display = "none";
     } else {
         fpsSelect.disabled = false;
     }
 }
 
-updateCanvasSizeAndFPS();
-resolutionSelect.addEventListener("change", updateCanvasSizeAndFPS);
+resolutionSelect.addEventListener("change", updateCanvasAndFPS);
+updateCanvasAndFPS();
+
+/* fpsロック解除トグル */
+fpsUnlockBtn.addEventListener("click", () => {
+    fpsUnlocked = !fpsUnlocked;
+
+    fpsUnlockBtn.innerText =
+        fpsUnlocked ? "FPSロック解除：ON" : "FPSロック解除：OFF";
+
+    fpsWarning.style.display =
+        (fpsUnlocked && SIZE === 360) ? "block" : "none";
+
+    updateCanvasAndFPS();
+});
 
 document.getElementById("upload").addEventListener("change", e => {
     const file = e.target.files[0];
@@ -129,7 +175,9 @@ document.getElementById("upload").addEventListener("change", e => {
 
     video.onloadedmetadata = async () => {
 
-        const FPS = (SIZE === 360) ? 10 : Number(fpsSelect.value);
+        const FPS = (SIZE === 360 && !fpsUnlocked)
+            ? 10
+            : Number(fpsSelect.value);
 
         let selected = timeLimitSelect.value;
         let maxTime;
@@ -137,10 +185,7 @@ document.getElementById("upload").addEventListener("change", e => {
         if (selected === "auto") {
             maxTime = Math.min(video.duration, AUTO_MAX_TIME);
         } else {
-            maxTime = Number(selected);
-            if (video.duration < maxTime) {
-                maxTime = video.duration;
-            }
+            maxTime = Math.min(Number(selected), video.duration);
         }
 
         const totalFrames = Math.floor(maxTime * FPS);
@@ -157,9 +202,6 @@ document.getElementById("upload").addEventListener("change", e => {
             status.innerText = `処理中 ${i + 1}/${totalFrames}`;
         }
 
-        // 1行目：fps
-        // 2行目：ピクセル高さ
-        // 3行目：総フレーム数
         finalData.unshift(totalFramesGlobal);
         finalData.unshift(pixelHeightPerFrame);
         finalData.unshift(FPS);
